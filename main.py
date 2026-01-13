@@ -224,6 +224,35 @@ class WinGetGUI:
         except Exception:
             pass
 
+    def show_category(self, category_name):
+        # Clear previous
+        for widget in self.apps_container.winfo_children():
+            widget.destroy()
+        apps = self.categories.get(category_name, [])
+        if not apps:
+            ttk.Label(self.apps_container, text="No apps in this category").pack()
+            return
+        top_frame = ttk.Frame(self.apps_container)
+        top_frame.pack(fill=tk.X)
+        ttk.Label(top_frame, text=f"Apps in {category_name}:").pack(side=tk.LEFT)
+        ttk.Button(top_frame, text="Install All", command=lambda: self.install_category_all(category_name)).pack(side=tk.RIGHT)
+        for name, pkgid in apps:
+            row = ttk.Frame(self.apps_container)
+            row.pack(fill=tk.X, pady=2)
+            ttk.Label(row, text=name).pack(side=tk.LEFT, padx=5)
+            ttk.Button(row, text="Install", command=lambda p=pkgid, n=name: self._install_from_category(p, n)).pack(side=tk.RIGHT, padx=5)
+
+    def install_category_all(self, category_name):
+        apps = self.categories.get(category_name, [])
+        if not apps:
+            return
+        for name, pkgid in apps:
+            threading.Thread(target=self._install_thread, args=(pkgid,), daemon=True).start()
+
+    def _install_from_category(self, package, display_name):
+        self.status_var.set(f"Installing {display_name}...")
+        threading.Thread(target=self._install_thread, args=(package,), daemon=True).start()
+
     def toggle_dark_mode(self):
         # Manual toggle disables following the system theme
         if getattr(self, 'follow_system_var', None):
@@ -710,63 +739,6 @@ class _ModernMenu(tk.Toplevel):
             self.root.quit()
         except Exception:
             self.root.destroy()
-
-    def show_about(self):
-        # About dialog
-        about = tk.Toplevel(self.root)
-        about.title("About WinGet Package Installer")
-        about.geometry("400x220")
-        about.resizable(False, False)
-        about.transient(self.root)
-        about.grab_set()
-        # Use current theme colors if available
-        colors = getattr(self, '_theme_colors', {'bg': '#f0f0f0', 'fg': '#000000', 'entry_bg': '#ffffff', 'text_bg': '#ffffff'})
-        try:
-            about.configure(bg=colors['bg'])
-        except Exception:
-            pass
-
-        content = ttk.Frame(about, padding=12)
-        content.pack(fill=tk.BOTH, expand=True)
-        ttk.Label(content, text="WinGet Package Installer", font=("Segoe UI", 12, "bold")).pack(pady=(6,6))
-        ttk.Label(content, text="Simple GUI to search and install packages via winget.").pack(pady=(0,8))
-        ttk.Label(content, text=f"\nVersion: 0.1.1\nCopyright © Nikki 2026\n").pack()
-        ttk.Button(content, text="Close", command=about.destroy).pack(pady=(8,0))
-
-        # center the about dialog over root
-        about.update_idletasks()
-        x = self.root.winfo_rootx() + (self.root.winfo_width() // 2) - (about.winfo_width() // 2)
-        y = self.root.winfo_rooty() + (self.root.winfo_height() // 2) - (about.winfo_height() // 2)
-        about.geometry(f"+{x}+{y}")
-
-    def show_category(self, category_name):
-        # Clear previous
-        for widget in self.apps_container.winfo_children():
-            widget.destroy()
-        apps = self.categories.get(category_name, [])
-        if not apps:
-            ttk.Label(self.apps_container, text="No apps in this category").pack()
-            return
-        top_frame = ttk.Frame(self.apps_container)
-        top_frame.pack(fill=tk.X)
-        ttk.Label(top_frame, text=f"Apps in {category_name}:").pack(side=tk.LEFT)
-        ttk.Button(top_frame, text="Install All", command=lambda: self.install_category_all(category_name)).pack(side=tk.RIGHT)
-        for name, pkgid in apps:
-            row = ttk.Frame(self.apps_container)
-            row.pack(fill=tk.X, pady=2)
-            ttk.Label(row, text=name).pack(side=tk.LEFT, padx=5)
-            ttk.Button(row, text="Install", command=lambda p=pkgid, n=name: self._install_from_category(p, n)).pack(side=tk.RIGHT, padx=5)
-
-    def install_category_all(self, category_name):
-        apps = self.categories.get(category_name, [])
-        if not apps:
-            return
-        for name, pkgid in apps:
-            threading.Thread(target=self._install_thread, args=(pkgid,), daemon=True).start()
-
-    def _install_from_category(self, package, display_name):
-        self.status_var.set(f"Installing {display_name}...")
-        threading.Thread(target=self._install_thread, args=(package,), daemon=True).start()
 
 if __name__ == "__main__":
     root = tk.Tk()
