@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['c:\\Users\\Nikki Caspar\\Documents\\WinGet Python app\\main.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['c:\\Users\\Nikki Caspar\\Documents\\WinGet Python app\\app_icon.ico'],
+    icon=['app_icon.ico'],
 )

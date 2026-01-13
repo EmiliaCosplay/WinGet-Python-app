@@ -32,13 +32,32 @@ class WinGetGUI:
         self.theme_var = tk.StringVar(value='dark' if self.dark_mode_var.get() else 'light')
         self.follow_system_var = tk.BooleanVar(value=False)
 
-        self._create_app_menu_bar()
+        # Window menu moved to native menubar (replaces app-style top bar)
+        window_menu = tk.Menu(menubar, tearoff=0)
+        window_menu.add_checkbutton(label='Always on Top', variable=self.topmost_var, command=self.toggle_topmost)
+        window_menu.add_radiobutton(label='Light', variable=self.theme_var, value='light', command=lambda: self._set_theme_from_menu('light'))
+        window_menu.add_radiobutton(label='Dark', variable=self.theme_var, value='dark', command=lambda: self._set_theme_from_menu('dark'))
+        window_menu.add_separator()
+        window_menu.add_checkbutton(label='Follow System Theme', variable=self.follow_system_var, command=self.toggle_follow_system)
+        window_menu.add_separator()
+        window_menu.add_command(label='Refresh System Theme\tCtrl+R', command=self._refresh_system_theme)
+        window_menu.add_command(label='Toggle Dark Mode\tCtrl+D', command=lambda: self._key_toggle_dark())
+        menubar.add_cascade(label='Window', menu=window_menu)
 
-        # Toolbar with a refresh button (hidden Dark Mode toggle retained for compatibility)
+        # Toolbar (Dark Mode toggle retained for compatibility)
         toolbar = ttk.Frame(self.root, padding="4")
         toolbar.pack(fill=tk.X, padx=10, pady=(5,0))
         self.toolbar_dark_chk = ttk.Checkbutton(toolbar, text="Dark Mode", variable=self.dark_mode_var, command=self._toolbar_toggle_dark)
-        ttk.Button(toolbar, text="Refresh System Theme", command=self._refresh_system_theme).pack(side=tk.LEFT, padx=(6,0))
+        # Note: 'Refresh System Theme' button moved into Window menu
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="About", command=self.show_about)
+        menubar.add_cascade(label="Help", menu=help_menu) 
+        # keyboard shortcut for Exit
+        self.root.bind_all("<Control-q>", lambda e: self.exit_app())
+        # keyboard shortcuts for Dark Mode and Refresh
+        self.root.bind_all("<Control-d>", lambda e: self._key_toggle_dark())
+        self.root.bind_all("<Control-r>", lambda e: self._refresh_system_theme())
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="About", command=self.show_about)
         menubar.add_cascade(label="Help", menu=help_menu) 
@@ -272,6 +291,18 @@ class WinGetGUI:
         self.apply_theme(self.dark_mode_var.get())
         self.save_settings()
 
+    def _key_toggle_dark(self, event=None):
+        """Keyboard shortcut handler to toggle Dark Mode and disable following system theme."""
+        if getattr(self, 'follow_system_var', None):
+            self.follow_system_var.set(False)
+            try:
+                self.stop_system_watch()
+            except Exception:
+                pass
+        # toggle dark mode flag and apply
+        self.dark_mode_var.set(not self.dark_mode_var.get())
+        self.toggle_dark_mode()
+
     def apply_theme(self, dark):
         style = ttk.Style()
         try:
@@ -345,65 +376,7 @@ class WinGetGUI:
         except Exception:
             pass
 
-    # --- Modern app-style menu popup implementation (Windows 11-like) ---
-    def _create_app_menu_bar(self):
-        """Create a slim app-style bar with File / Window / Help buttons that show modern popups."""
-        # Place the app menu bar just under the native menu
-        try:
-            self._app_menu_bar = ttk.Frame(self.root, padding=(6,2), style='AppBar.TFrame')
-            self._app_menu_bar.pack(fill=tk.X, padx=6)
-            btn_style = 'App.TButton'
-            ttk.Style().configure(btn_style, relief='flat', padding=(8,4))
-            ttk.Button(self._app_menu_bar, text='File', style=btn_style, command=self._open_file_menu).pack(side=tk.LEFT, padx=(2,4))
-            ttk.Button(self._app_menu_bar, text='Window', style=btn_style, command=self._open_window_menu).pack(side=tk.LEFT, padx=(2,4))
-            ttk.Button(self._app_menu_bar, text='Help', style=btn_style, command=self._open_help_menu).pack(side=tk.LEFT, padx=(2,4))
-        except Exception:
-            pass
-
-    def _open_file_menu(self):
-        # For now, open a simple modern menu with Exit
-        items = [
-            {'type': 'cmd', 'label': 'Exit', 'command': self.exit_app},
-        ]
-        self._show_modern_menu(items, anchor_widget=self._app_menu_bar.winfo_children()[0])
-
-    def _open_window_menu(self):
-        # Window menu items: Always on Top, Light/Dark, Follow System
-        items = [
-            {'type': 'check', 'label': 'Always on Top', 'var': self.topmost_var, 'command': self.toggle_topmost},
-            {'type': 'radio', 'label': 'Light', 'group': 'theme', 'value': 'light', 'command': lambda: self._set_theme_from_menu('light')},
-            {'type': 'radio', 'label': 'Dark', 'group': 'theme', 'value': 'dark', 'command': lambda: self._set_theme_from_menu('dark')},
-            {'type': 'sep'},
-            {'type': 'check', 'label': 'Follow System Theme', 'var': self.follow_system_var, 'command': self.toggle_follow_system},
-        ]
-        self._show_modern_menu(items, anchor_widget=self._app_menu_bar.winfo_children()[1])
-
-    def _open_help_menu(self):
-        items = [
-            {'type': 'cmd', 'label': 'About', 'command': self.show_about},
-        ]
-        self._show_modern_menu(items, anchor_widget=self._app_menu_bar.winfo_children()[2])
-
-    def _show_modern_menu(self, items, anchor_widget):
-        # Close previous menu if open
-        self._close_modern_menu()
-        try:
-            x = anchor_widget.winfo_rootx()
-            y = anchor_widget.winfo_rooty() + anchor_widget.winfo_height()
-        except Exception:
-            x = self.root.winfo_rootx() + 10
-            y = self.root.winfo_rooty() + 30
-        colors = getattr(self, '_theme_colors', {'bg': '#ffffff', 'fg': '#000000', 'entry_bg': '#ffffff'})
-        menu = _ModernMenu(self.root, items, x, y, colors, on_close=self._close_modern_menu)
-        self._current_modern_menu = menu
-
-    def _close_modern_menu(self):
-        try:
-            if getattr(self, '_current_modern_menu', None):
-                self._current_modern_menu.close()
-                self._current_modern_menu = None
-        except Exception:
-            pass
+    # Legacy modern menu removed; using native menubar for File/Window/Help actions
 
     def get_system_dark_preference(self):
         """Return True if Windows is set to dark mode for apps, False otherwise."""
@@ -535,7 +508,7 @@ class WinGetGUI:
         content.pack(fill=tk.BOTH, expand=True)
         ttk.Label(content, text="WinGet Package Installer", font=("Segoe UI", 12, "bold")).pack(pady=(6,6))
         ttk.Label(content, text="Simple GUI to search and install packages via winget.").pack(pady=(0,8))
-        ttk.Label(content, text=f"\nVersion: 0.1.1\nCopyright © Nikki 2026\n").pack()
+        ttk.Label(content, text=f"\nVersion: 0.2 beta\nCopyright © Nikki 2026\n").pack()
         ttk.Button(content, text="Close", command=about.destroy).pack(pady=(8,0))
 
         # center the about dialog over root
@@ -545,202 +518,10 @@ class WinGetGUI:
         about.geometry(f"+{x}+{y}")
 
 
-class _ModernMenu(tk.Toplevel):
-    """Lightweight modern-looking popup menu implemented as an overrideredirect Toplevel.
-    Supports command, check, radio and separator item types (minimal).
-    """
-    def __init__(self, parent, items, x, y, colors, on_close=None):
-        super().__init__(parent)
-        self.overrideredirect(True)
-        self.transient(parent)
-        self.attributes('-topmost', True)
-        self.configure(bg=colors.get('bg', '#ffffff'))
-        # Outer frame
-        frm = ttk.Frame(self, padding=6, style='Menu.TFrame')
-        frm.pack()
-        self._parent = parent
-        self._on_close = on_close
-        # Build items
-        for it in items:
-            it_type = it.get('type', 'cmd')
-            if it_type == 'sep':
-                ttk.Separator(frm, orient='horizontal').pack(fill=tk.X, pady=4)
-                continue
-            row = ttk.Frame(frm)
-            row.pack(fill=tk.X, pady=2)
-            label_text = it.get('label', '')
-            if it_type == 'check':
-                var = it.get('var')
-                indicator = '✓' if getattr(var, 'get', lambda: False)() else ' '
-                lbl = ttk.Label(row, text=indicator, width=2)
-                lbl.pack(side=tk.LEFT)
-                btn = ttk.Button(row, text=label_text, command=self._wrap_cmd(it), style='Menu.TButton')
-                btn.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            elif it_type == 'radio':
-                # determine current state from theme_var if available
-                group = it.get('group')
-                current = getattr(parent, 'theme_var', None)
-                indicator = '●' if (current and current.get() == it.get('value')) else ' '
-                lbl = ttk.Label(row, text=indicator, width=2)
-                lbl.pack(side=tk.LEFT)
-                btn = ttk.Button(row, text=label_text, command=self._wrap_cmd(it), style='Menu.TButton')
-                btn.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            else:
-                btn = ttk.Button(row, text=label_text, command=self._wrap_cmd(it), style='Menu.TButton')
-                btn.pack(fill=tk.X)
-        # place window
-        self.geometry(f"+{x}+{y}")
-        # click outside to close
-        self._click_binding = parent.bind_all('<Button-1>', self._on_global_click, '+')
-        self.bind('<FocusOut>', lambda e: self.close())
-        self.after(10, lambda: self.focus_force())
-
-    def _wrap_cmd(self, item):
-        def _cmd():
-            try:
-                if item.get('type') == 'check' and item.get('var') is not None:
-                    item['var'].set(not item['var'].get())
-                cmd = item.get('command')
-                if callable(cmd):
-                    cmd()
-            finally:
-                self.close()
-        return _cmd
-
-    def _on_global_click(self, event):
-        # close if click not inside this window
-        if not self.winfo_containing(event.x_root, event.y_root):
-            self.close()
-
-    def close(self):
-        try:
-            if getattr(self._parent, 'unbind_all', None) and getattr(self, '_click_binding', None):
-                self._parent.unbind_all('<Button-1>')
-        except Exception:
-            pass
-        try:
-            if callable(self._on_close):
-                self._on_close()
-        except Exception:
-            pass
-        try:
-            self.destroy()
-        except Exception:
-            pass
-
-
-    def get_system_dark_preference(self):
-        """Return True if Windows is set to dark mode for apps, False otherwise."""
-        try:
-            if winreg is None:
-                return False
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize") as key:
-                val, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-            # AppsUseLightTheme: 1 = light, 0 = dark
-            return bool(val == 0)
-        except Exception:
-            return False
-
-    def _check_system_theme(self):
-        if not getattr(self, 'follow_system_var', tk.BooleanVar(value=False)).get():
-            return
-        sys_dark = self.get_system_dark_preference()
-        if sys_dark != getattr(self, '_system_theme_last', None):
-            self._system_theme_last = sys_dark
-            self.dark_mode_var.set(sys_dark)
-            self.apply_theme(sys_dark)
-        # schedule next check
-        try:
-            self._system_watch_id = self.root.after(5000, self._check_system_theme)
-        except Exception:
-            pass
-
-    def start_system_watch(self):
-        self._system_theme_last = None
-        try:
-            self._check_system_theme()
-        except Exception:
-            pass
-
-    def stop_system_watch(self):
-        try:
-            if getattr(self, '_system_watch_id', None):
-                self.root.after_cancel(self._system_watch_id)
-                self._system_watch_id = None
-        except Exception:
-            pass
-
-    def _set_theme_from_menu(self, val):
-        """Set theme from the top-bar Theme submenu ('light' or 'dark')."""
-        # Selecting a theme from the menu disables following the system theme.
-        if getattr(self, 'follow_system_var', None):
-            self.follow_system_var.set(False)
-            try:
-                self.stop_system_watch()
-            except Exception:
-                pass
-            try:
-                self.toolbar_dark_chk.state(['!disabled'])
-            except Exception:
-                pass
-        self.dark_mode_var.set(val == 'dark')
-        try:
-            self.theme_var.set(val)
-        except Exception:
-            pass
-        self.apply_theme(self.dark_mode_var.get())
-        self.save_settings()
-
-    def toggle_follow_system(self):
-        if getattr(self, 'follow_system_var', tk.BooleanVar(value=False)).get():
-            # Enable follow system
-            sys_dark = self.get_system_dark_preference()
-            self.dark_mode_var.set(sys_dark)
-            try:
-                self.theme_var.set('dark' if sys_dark else 'light')
-            except Exception:
-                pass
-            self.apply_theme(sys_dark)
-            try:
-                self.toolbar_dark_chk.state(['disabled'])
-            except Exception:
-                pass
-            self.start_system_watch()
-        else:
-            # Disable follow system
-            try:
-                self.toolbar_dark_chk.state(['!disabled'])
-            except Exception:
-                pass
-            self.stop_system_watch()
-        self.save_settings()
-
-    def _toolbar_toggle_dark(self):
-        # User toggled the visible toolbar switch; disable follow-system and apply
-        if getattr(self, 'follow_system_var', None):
-            self.follow_system_var.set(False)
-            try:
-                self.stop_system_watch()
-            except Exception:
-                pass
-        self.toggle_dark_mode()
-
-    def _refresh_system_theme(self):
-        if getattr(self, 'follow_system_var', tk.BooleanVar(value=False)).get():
-            self._check_system_theme()
-
-    def exit_app(self):
-        # Graceful exit
-        try:
-            self.stop_system_watch()
-        except Exception:
-            pass
-        try:
-            self.root.quit()
-        except Exception:
-            self.root.destroy()
+# Removed legacy _ModernMenu class and duplicate method definitions; using native menubar for File/Window/Help actions
 
 if __name__ == "__main__":
+
     root = tk.Tk()
     app = WinGetGUI(root)
     root.mainloop()

@@ -5,7 +5,7 @@
 !define COMPANY "Nikki"
 !define EXE_NAME "main.exe"
 !define OUT_FILE "WinGet-Package-Installer-Setup.exe"
-!define APP_VERSION "0.1.1"
+!define APP_VERSION "0.2 beta"
 
 Name "${APP_NAME}"
 OutFile "out\${OUT_FILE}"
