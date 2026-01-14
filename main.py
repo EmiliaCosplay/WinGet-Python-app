@@ -31,6 +31,7 @@ class WinGetGUI:
         self.dark_mode_var = tk.BooleanVar(value=False)
         self.theme_var = tk.StringVar(value='dark' if self.dark_mode_var.get() else 'light')
         self.follow_system_var = tk.BooleanVar(value=False)
+        self.package_manager_var = tk.StringVar(value='winget')
 
         # Window menu moved to native menubar (replaces app-style top bar)
         window_menu = tk.Menu(menubar, tearoff=0)
@@ -44,11 +45,16 @@ class WinGetGUI:
         window_menu.add_command(label='Toggle Dark Mode\tCtrl+D', command=lambda: self._key_toggle_dark())
         menubar.add_cascade(label='Window', menu=window_menu)
 
-        # Toolbar (Dark Mode toggle retained for compatibility)
+        # Toolbar (Dark Mode toggle and Package Manager selector)
         toolbar = ttk.Frame(self.root, padding="4")
         toolbar.pack(fill=tk.X, padx=10, pady=(5,0))
         self.toolbar_dark_chk = ttk.Checkbutton(toolbar, text="Dark Mode", variable=self.dark_mode_var, command=self._toolbar_toggle_dark)
-        # Note: 'Refresh System Theme' button moved into Window menu
+        
+        # Package Manager selector
+        ttk.Label(toolbar, text="Package Manager:").pack(side=tk.LEFT, padx=(20, 5))
+        ttk.Radiobutton(toolbar, text="WinGet", variable=self.package_manager_var, value='winget').pack(side=tk.LEFT, padx=2)
+        ttk.Radiobutton(toolbar, text="Chocolatey", variable=self.package_manager_var, value='chocolatey').pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Install Chocolatey", command=self.install_chocolatey).pack(side=tk.LEFT, padx=(20, 5))
 
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="About", command=self.show_about)
@@ -102,6 +108,8 @@ class WinGetGUI:
                 ("Google Chrome", "Google.Chrome"),
                 ("Firefox", "Mozilla.Firefox"),
                 ("Microsoft Edge", "Microsoft.Edge"),
+                ("Brave Browser", "Brave.Brave"),
+                ("Zen Browser", "ZenBrowser.Zen"),
             ],
             "Development": [
                 ("Visual Studio Code", "Microsoft.VisualStudioCode"),
@@ -111,6 +119,13 @@ class WinGetGUI:
             "Media": [
                 ("VLC", "VideoLAN.VLC"),
                 ("Spotify", "Spotify.Spotify"),
+            ],
+            "Gaming": [
+                ("Steam", "Valve.Steam"),
+                ("Epic Games Launcher", "EpicGames.EpicGameLauncher"),
+                ("GOG Galaxy", "GOG.Galaxy"),
+                ("Discord", "Discord.Discord"),
+                ("OBS Studio", "OBSProject.OBSStudio"),
             ],
             "Utilities": [
                 ("7-Zip", "7zip.7zip"),
@@ -158,13 +173,22 @@ class WinGetGUI:
         threading.Thread(target=self._search_thread, args=(query,), daemon=True).start()
     
     def _search_thread(self, query):
+        manager = self.package_manager_var.get()
         try:
-            result = subprocess.run(
-                ["winget", "search", query],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            if manager == 'chocolatey':
+                result = subprocess.run(
+                    ["choco", "search", query],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+            else:  # winget
+                result = subprocess.run(
+                    ["winget", "search", query],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
             self.results_text.delete(1.0, tk.END)
             self.results_text.insert(tk.END, result.stdout)
             self.status_var.set("Search complete")
@@ -183,12 +207,20 @@ class WinGetGUI:
         threading.Thread(target=self._install_thread, args=(package,), daemon=True).start()
     
     def _install_thread(self, package):
+        manager = self.package_manager_var.get()
         try:
-            subprocess.run(
-                ["winget", "install", "-e", "--id", package, "--accept-package-agreements", "--accept-source-agreements"],
-                check=True,
-                timeout=300
-            )
+            if manager == 'chocolatey':
+                subprocess.run(
+                    ["choco", "install", package, "-y"],
+                    check=True,
+                    timeout=300
+                )
+            else:  # winget
+                subprocess.run(
+                    ["winget", "install", "-e", "--id", package, "--accept-package-agreements", "--accept-source-agreements"],
+                    check=True,
+                    timeout=300
+                )
             self.status_var.set(f"✓ {package} installed successfully")
             messagebox.showinfo("Success", f"{package} installed successfully!")
         except subprocess.CalledProcessError:
@@ -354,6 +386,10 @@ class WinGetGUI:
             style.configure('TCheckbutton', background=bg, foreground=fg)
             style.map('TCheckbutton', background=[('active', bg)], foreground=[('active', fg)])
 
+            # Radiobuttons
+            style.configure('TRadiobutton', background=bg, foreground=fg)
+            style.map('TRadiobutton', background=[('active', bg)], foreground=[('active', fg)])
+
             # Scrollbars (visual consistency)
             style.configure('Vertical.TScrollbar', background=entry_bg, troughcolor=bg)
             style.configure('Horizontal.TScrollbar', background=entry_bg, troughcolor=bg)
@@ -477,6 +513,43 @@ class WinGetGUI:
     def _refresh_system_theme(self):
         if getattr(self, 'follow_system_var', tk.BooleanVar(value=False)).get():
             self._check_system_theme()
+
+    def install_chocolatey(self):
+        """Install Chocolatey package manager."""
+        response = messagebox.askyesno(
+            "Install Chocolatey",
+            "This will install Chocolatey, a Windows package manager.\n\n"
+            "Chocolatey requires administrator privileges.\n\n"
+            "Do you want to proceed?"
+        )
+        if not response:
+            return
+        
+        self.status_var.set("Installing Chocolatey...")
+        threading.Thread(target=self._install_chocolatey_thread, daemon=True).start()
+    
+    def _install_chocolatey_thread(self):
+        try:
+            # Run PowerShell command to install Chocolatey
+            ps_command = (
+                "Set-ExecutionPolicy Bypass -Scope Process -Force; "
+                "[System.Net.ServicePointManager]::SecurityProtocol = "
+                "[System.Net.ServicePointManager]::SecurityProtocol -bor 3072; "
+                "iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
+            )
+            subprocess.run(
+                ["powershell", "-Command", ps_command],
+                check=True,
+                timeout=600
+            )
+            self.status_var.set("✓ Chocolatey installed successfully")
+            messagebox.showinfo("Success", "Chocolatey installed successfully!\n\nPlease restart the application for changes to take effect.")
+        except subprocess.CalledProcessError:
+            self.status_var.set("Installation failed")
+            messagebox.showerror("Error", "Failed to install Chocolatey. Make sure you have administrator privileges.")
+        except Exception as e:
+            self.status_var.set("Error")
+            messagebox.showerror("Error", f"Error installing Chocolatey: {str(e)}")
 
     def exit_app(self):
         # Graceful exit
