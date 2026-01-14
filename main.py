@@ -581,7 +581,7 @@ class WinGetGUI:
         content.pack(fill=tk.BOTH, expand=True)
         ttk.Label(content, text="WinGet Package Installer", font=("Segoe UI", 12, "bold")).pack(pady=(6,6))
         ttk.Label(content, text="Simple GUI to search and install packages via winget.").pack(pady=(0,8))
-        ttk.Label(content, text="\nVersion: 0.2 beta\nCopyright © 2026 Nikki\nLicensed under the GNU GPL v3 (see LICENSE)").pack()
+        ttk.Label(content, text="\nVersion: 0.2.1 beta\nCopyright © 2026 Nikki\nLicensed under the GNU GPL v3 (see LICENSE)").pack()
         ttk.Button(content, text="Close", command=about.destroy).pack(pady=(8,0))
 
         # center the about dialog over root
