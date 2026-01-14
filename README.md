@@ -1,4 +1,4 @@
-# WinGet Python app
+# WinGet - Chocolatey Python app
 
 Simple GUI to search for and install packages using winget.
 
