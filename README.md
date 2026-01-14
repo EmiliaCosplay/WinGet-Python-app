@@ -1,6 +1,6 @@
 # WinGet - Chocolatey Python app
 
-Simple GUI to search for and install packages using winget.
+Simple GUI to search for and install packages using winget and chocolatey.
 
 ## Build (create EXE)
 
