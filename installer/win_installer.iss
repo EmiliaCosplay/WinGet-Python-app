@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=WinGet Package Installer
-AppVersion=0.2.2 beta
+AppVersion=0.2.2_01 beta bugfix release
 AppPublisher=Nikki
 DefaultDirName={pf}\WinGet Package Installer
 DefaultGroupName=WinGet Package Installer
