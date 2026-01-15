@@ -17,6 +17,33 @@ SetupIconFile=..\app_icon.ico
 Uninstallable=yes
 UninstallDisplayIcon={app}\app_icon.ico
 
+[Code]
+function NeedsAddPath(Param: string): boolean;
+var
+  OrigPath: string;
+begin
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OrigPath) then begin
+    RegQueryStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', OrigPath);
+  end;
+  Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Path: string;
+  AppPath: string;
+begin
+  if CurUninstallStep = usUninstall then begin
+    AppPath := ExpandConstant('{app}');
+    if RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path) then begin
+      StringChangeEx(Path, ';' + AppPath + ';', ';', True);
+      StringChangeEx(Path, AppPath + ';', '', True);
+      StringChangeEx(Path, ';' + AppPath, '', True);
+      RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path);
+    end;
+  end;
+end;
+
 [Files]
 Source: "..\dist\main.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\app_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
@@ -47,3 +74,6 @@ Root: HKLM; Subkey: "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Unins
 Root: HKLM; Subkey: "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\WinGet Package Installer"; ValueType: string; ValueName: "InstallLocation"; ValueData: "{app}"; Flags: uninsdeletevalue
 Root: HKLM; Subkey: "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\WinGet Package Installer"; ValueType: string; ValueName: "UninstallString"; ValueData: "{uninstallexe}"; Flags: uninsdeletevalue
 Root: HKLM; Subkey: "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\WinGet Package Installer"; ValueType: string; ValueName: "DisplayIcon"; ValueData: "{app}\app_icon.ico"; Flags: uninsdeletevalue
+
+; Add the app directory to the user's PATH
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath('{app}')
