@@ -15,8 +15,15 @@ except Exception:
 class WinGetGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("WinGet Package Installer")
-        self.root.geometry("900x700")
+        self.root.title("WinGet Package Manager")
+        self.root.geometry("1100x800")
+        self.root.resizable(True, True)
+        
+        # Try to set window transparency for Mica-like effect
+        try:
+            self.root.attributes('-alpha', 0.98)  # Slight transparency
+        except:
+            pass  # Not supported on all platforms
         
         # Menu Bar (keep native menu for keyboard shortcuts)
         menubar = tk.Menu(self.root)
@@ -46,8 +53,8 @@ class WinGetGUI:
         menubar.add_cascade(label='Window', menu=window_menu)
 
         # Toolbar (Dark Mode toggle and Package Manager selector)
-        toolbar = ttk.Frame(self.root, padding="4")
-        toolbar.pack(fill=tk.X, padx=10, pady=(5,0))
+        toolbar = ttk.Frame(self.root, padding=(24, 12))
+        toolbar.pack(fill=tk.X, padx=0, pady=(0, 16))
         self.toolbar_dark_chk = ttk.Checkbutton(toolbar, text="Dark Mode", variable=self.dark_mode_var, command=self._toolbar_toggle_dark)
         
         # Package Manager selector
@@ -65,38 +72,50 @@ class WinGetGUI:
         self.root.bind_all("<Control-d>", lambda e: self._key_toggle_dark())
         self.root.bind_all("<Control-r>", lambda e: self._refresh_system_theme())
         
+        # Notebook for tabs
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=24, pady=(0, 24))
+        
+        # Packages Tab
+        self.packages_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.packages_tab, text="Packages")
+        
+        # Shortcuts Tab
+        self.shortcuts_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.shortcuts_tab, text="Shortcuts")
+        
         # Search Frame (hidden by default under Advanced options)
-        self.search_frame = ttk.Frame(root, padding="10")
+        self.search_frame = ttk.Frame(self.packages_tab, padding=(0, 12))
         # not packed by default
         
-        ttk.Label(self.search_frame, text="Package ID:").pack(side=tk.LEFT, padx=5)
+        ttk.Label(self.search_frame, text="Package ID:").pack(side=tk.LEFT, padx=(0, 12))
         self.search_var = tk.StringVar()
         ttk.Entry(self.search_frame, textvariable=self.search_var, width=40).pack(side=tk.LEFT, padx=5)
         ttk.Button(self.search_frame, text="Search", command=self.search_package).pack(side=tk.LEFT, padx=5)
         
         # Results Frame (hidden by default under Advanced options)
-        self.results_frame = ttk.LabelFrame(root, text="Search Results", padding="10")
+        self.results_frame = ttk.LabelFrame(self.packages_tab, text="Search Results", padding=(16, 12))
         # not packed by default
         
-        self.results_text = scrolledtext.ScrolledText(self.results_frame, height=10, width=70)
+        self.results_text = scrolledtext.ScrolledText(self.results_frame, height=14, width=90)
         self.results_text.pack(fill=tk.BOTH, expand=True)
         
         # Advanced Options (hide/install by ID)
         self.advanced_var = tk.BooleanVar(value=False)
-        adv_chk = ttk.Checkbutton(root, text="Advanced options", variable=self.advanced_var, command=self.toggle_advanced)
-        adv_chk.pack(anchor=tk.W, padx=10, pady=(5,0))
+        adv_chk = ttk.Checkbutton(self.packages_tab, text="Advanced options", variable=self.advanced_var, command=self.toggle_advanced)
+        adv_chk.pack(anchor=tk.W, padx=24, pady=(12, 0))
         
         # Install Frame (hidden by default; shows when Advanced options checked)
-        self.install_frame = ttk.Frame(root, padding="10")
-        ttk.Label(self.install_frame, text="Package ID to Install:").pack(side=tk.LEFT, padx=5)
+        self.install_frame = ttk.Frame(self.packages_tab, padding=(0, 12))
+        ttk.Label(self.install_frame, text="Package ID to Install:").pack(side=tk.LEFT, padx=(0, 12))
         self.install_var = tk.StringVar()
         ttk.Entry(self.install_frame, textvariable=self.install_var, width=40).pack(side=tk.LEFT, padx=5)
         ttk.Button(self.install_frame, text="Install", command=self.install_package).pack(side=tk.LEFT, padx=5)
         # (not packed by default)
         
         # Categories Frame
-        self.categories_frame = ttk.LabelFrame(root, text="Categories", padding="10")
-        self.categories_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.categories_frame = ttk.LabelFrame(self.packages_tab, text="Categories", padding=(16, 12))
+        self.categories_frame.pack(fill=tk.X, padx=24, pady=(12, 0))
         
         self.categories = {
             "Browsers": [
@@ -147,17 +166,56 @@ class WinGetGUI:
             ttk.Button(cat_buttons_frame, text=cat, command=lambda c=cat: self.show_category(c)).pack(side=tk.LEFT, padx=5, pady=2) 
         
         # Category Apps Frame (shows apps for selected category)
-        category_list_frame = ttk.LabelFrame(root, text="Category Apps", padding="10")
-        category_list_frame.pack(fill=tk.BOTH, expand=False, padx=10, pady=5)
+        category_list_frame = ttk.LabelFrame(self.packages_tab, text="Category Apps", padding=(16, 12))
+        category_list_frame.pack(fill=tk.BOTH, expand=False, padx=24, pady=(12, 0))
         
         self.apps_container = ttk.Frame(category_list_frame)
         self.apps_container.pack(fill=tk.X)
         # Show first category by default
         self.show_category(list(self.categories.keys())[0])
         
+        # Shortcuts Tab Content
+        self.shortcuts = {
+            "System Tools": [
+                ("Control Panel", "control"),
+                ("Task Manager", "taskmgr"),
+                ("System Settings", "start ms-settings:"),
+                ("Device Manager", "devmgmt.msc"),
+                ("Event Viewer", "eventvwr"),
+                ("Services", "services.msc"),
+                ("Registry Editor", "regedit"),
+            ],
+            "File Explorer": [
+                ("File Explorer", "explorer"),
+                ("This PC", "explorer /e,::{20D04FE0-3AEA-1069-A2D8-08002B30309D}"),
+                ("Documents", "explorer " + str(Path.home() / "Documents")),
+                ("Downloads", "explorer " + str(Path.home() / "Downloads")),
+                ("Desktop", "explorer " + str(Path.home() / "Desktop")),
+                ("Recycle Bin", "explorer shell:RecycleBinFolder"),
+            ],
+            "Apps": [
+                ("Calculator", "calc"),
+                ("Notepad", "notepad"),
+                ("Command Prompt", "cmd"),
+                ("PowerShell", "powershell"),
+                ("Paint", "mspaint"),
+                ("Snipping Tool", "snippingtool"),
+                ("WordPad", "write"),
+            ],
+        }
+        
+        shortcuts_frame = ttk.LabelFrame(self.shortcuts_tab, text="Windows Shortcuts", padding=(16, 12))
+        shortcuts_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=(12, 24))
+        
+        for cat in self.shortcuts.keys():
+            cat_frame = ttk.LabelFrame(shortcuts_frame, text=cat, padding=(12, 8))
+            cat_frame.pack(fill=tk.X, pady=(0, 12))
+            for name, cmd in self.shortcuts[cat]:
+                ttk.Button(cat_frame, text=name, command=lambda c=cmd: self.run_shortcut(c)).pack(side=tk.LEFT, padx=(0, 12), pady=6)
+        
         # Status
         self.status_var = tk.StringVar(value="Ready")
-        ttk.Label(root, textvariable=self.status_var).pack(padx=10, pady=5)
+        ttk.Label(self.packages_tab, textvariable=self.status_var).pack(padx=24, pady=(12, 24))
 
         # Configuration path for storing user settings (per-user)
         local_appdata = os.getenv('LOCALAPPDATA') or str(Path.home() / 'AppData' / 'Local')
@@ -312,6 +370,12 @@ class WinGetGUI:
         self.status_var.set(f"Installing {display_name}...")
         threading.Thread(target=self._install_thread, args=(package,), daemon=True).start()
 
+    def run_shortcut(self, command):
+        try:
+            subprocess.run(command, shell=True)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to run shortcut: {str(e)}")
+
     def toggle_dark_mode(self):
         # Manual toggle disables following the system theme
         if getattr(self, 'follow_system_var', None):
@@ -353,64 +417,75 @@ class WinGetGUI:
                 pass
 
             if dark:
-                # Dark theme colors
-                bg = '#2b2b2b'
-                fg = '#eaeaea'
-                entry_bg = '#3c3f41'
-                text_bg = '#1e1e1e'
-                pressed = '#252525'
+                # Windows 11 Dark Mica theme colors (more translucent)
+                bg = '#1F1F1F'  # More transparent dark background
+                fg = '#FFFFFF'
+                entry_bg = '#2A2A2A'  # Lighter card background
+                text_bg = '#151515'  # Darker text areas
+                pressed = '#333333'
+                accent = '#60CDFF'
+                border = '#333333'
             else:
-                # Light theme colors (kept neutral to match system look)
-                bg = '#f0f0f0'
+                # Windows 11 Light Mica theme colors (more translucent)
+                bg = '#FCFCFC'  # Very light, almost transparent
                 fg = '#000000'
-                entry_bg = '#ffffff'
-                text_bg = '#ffffff'
-                pressed = '#d9d9d9'
+                entry_bg = '#FFFFFF'  # Pure white cards
+                text_bg = '#FFFFFF'
+                pressed = '#F0F0F0'
+                accent = '#005FB8'
+                border = '#F0F0F0'
 
-            # Base widget colors
-            style.configure('.', background=bg, foreground=fg)
+            # Base widget colors and fonts
+            style.configure('.', background=bg, foreground=fg, font=('Segoe UI', 10))
             style.configure('TFrame', background=bg)
-            style.configure('TLabelframe', background=bg, foreground=fg)
-            style.configure('TLabelframe.Label', background=bg, foreground=fg)
-            style.configure('TLabel', background=bg, foreground=fg)
+            style.configure('TLabelframe', background=entry_bg, foreground=fg, borderwidth=1, relief='solid', labelmargins=12)
+            style.configure('TLabelframe.Label', background=entry_bg, foreground=accent if dark else fg, font=('Segoe UI', 12, 'bold'))
+            style.configure('TLabel', background=bg, foreground=fg, font=('Segoe UI', 10))
 
-            # Buttons (consistent padding and relief so size doesn't change)
-            style.configure('TButton', background=entry_bg, foreground=fg, relief='flat', padding=6)
+            # Buttons (modern Mica-style with subtle borders)
+            style.configure('TButton', background=entry_bg, foreground=fg, relief='solid', padding=(20, 10), borderwidth=1, font=('Segoe UI', 10))
             style.map('TButton',
-                      background=[('active', entry_bg), ('pressed', pressed)],
-                      foreground=[('active', fg), ('pressed', fg)])
+                      background=[('active', accent), ('pressed', pressed)],
+                      foreground=[('active', '#FFFFFF' if dark else '#FFFFFF'), ('pressed', fg)])
 
             # App-style menu bar and modern popup menu button styles
-            style.configure('App.TButton', background=entry_bg, foreground=fg)
-            style.configure('Menu.TButton', background=entry_bg, foreground=fg, relief='flat')
+            style.configure('App.TButton', background=entry_bg, foreground=fg, font=('Segoe UI', 9))
+            style.configure('Menu.TButton', background=entry_bg, foreground=fg, relief='flat', font=('Segoe UI', 9))
             style.configure('Menu.TFrame', background=entry_bg)
 
-            # Entries / Combobox
-            style.configure('TEntry', fieldbackground=entry_bg, foreground=fg)
-            style.configure('TCombobox', fieldbackground=entry_bg, foreground=fg)
+            # Entries / Combobox (modern rounded look)
+            style.configure('TEntry', fieldbackground=entry_bg, foreground=fg, borderwidth=0, relief='flat', font=('Segoe UI', 10), padding=(12, 6))
+            style.configure('TCombobox', fieldbackground=entry_bg, foreground=fg, borderwidth=0, font=('Segoe UI', 10))
             style.map('TCombobox', fieldbackground=[('readonly', entry_bg)])
 
             # Checkbuttons
-            style.configure('TCheckbutton', background=bg, foreground=fg)
+            style.configure('TCheckbutton', background=bg, foreground=fg, font=('Segoe UI', 10))
             style.map('TCheckbutton', background=[('active', bg)], foreground=[('active', fg)])
 
             # Radiobuttons
-            style.configure('TRadiobutton', background=bg, foreground=fg)
+            style.configure('TRadiobutton', background=bg, foreground=fg, font=('Segoe UI', 10))
             style.map('TRadiobutton', background=[('active', bg)], foreground=[('active', fg)])
 
-            # Scrollbars (visual consistency)
-            style.configure('Vertical.TScrollbar', background=entry_bg, troughcolor=bg)
-            style.configure('Horizontal.TScrollbar', background=entry_bg, troughcolor=bg)
+            # Scrollbars (modern thin design)
+            style.configure('Vertical.TScrollbar', background=entry_bg, troughcolor=bg, borderwidth=0, width=12)
+            style.configure('Horizontal.TScrollbar', background=entry_bg, troughcolor=bg, borderwidth=0, width=12)
 
-            # Root and ScrolledText widget - keep same relief/border in both themes to avoid layout shifts
+            # Notebook tabs (Windows 11 Mica style)
+            style.configure('TNotebook', background=bg, borderwidth=0)
+            style.configure('TNotebook.Tab', background=entry_bg, foreground=fg, padding=(24, 12), borderwidth=1, font=('Segoe UI', 11, 'bold'))
+            style.map('TNotebook.Tab',
+                      background=[('selected', accent), ('active', pressed)],
+                      foreground=[('selected', '#FFFFFF' if dark else '#FFFFFF'), ('active', fg)])
+
+            # Root and ScrolledText widget - modern styling
             self.root.configure(bg=bg)
-            self.results_text.configure(bg=text_bg, fg=fg, insertbackground=fg, highlightbackground=entry_bg, relief='sunken', bd=1)
+            self.results_text.configure(bg=text_bg, fg=fg, insertbackground=fg, highlightbackground=border, relief='flat', bd=0, font=('Consolas', 10))
 
-            # Ensure consistent border/paddings for frames and container widgets
+            # Ensure consistent border/paddings for frames and container widgets (Windows 11 spacing)
             try:
                 for w in self.root.winfo_children():
                     if isinstance(w, ttk.Frame) or isinstance(w, ttk.LabelFrame):
-                        w.configure(padding=4)
+                        w.configure(padding=(24, 16))
             except Exception:
                 pass
 
