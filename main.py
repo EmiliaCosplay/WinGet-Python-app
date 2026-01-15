@@ -64,11 +64,6 @@ class WinGetGUI:
         # keyboard shortcuts for Dark Mode and Refresh
         self.root.bind_all("<Control-d>", lambda e: self._key_toggle_dark())
         self.root.bind_all("<Control-r>", lambda e: self._refresh_system_theme())
-        help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="About", command=self.show_about)
-        menubar.add_cascade(label="Help", menu=help_menu) 
-        # keyboard shortcut for Exit
-        self.root.bind_all("<Control-q>", lambda e: self.exit_app())
         
         # Search Frame (hidden by default under Advanced options)
         self.search_frame = ttk.Frame(root, padding="10")
@@ -115,6 +110,12 @@ class WinGetGUI:
                 ("Visual Studio Code", "Microsoft.VisualStudioCode"),
                 ("Git", "Git.Git"),
                 ("Node.js", "OpenJS.NodeJS"),
+                ("Python", "Python.Python.3.12"),
+                ("OpenJDK", "EclipseAdoptium.Temurin.21.JDK"),
+                (".NET SDK", "Microsoft.DotNet.SDK.8"),
+                ("Docker Desktop", "Docker.DockerDesktop"),
+                ("Postman", "Postman.Postman"),
+                ("GitHub Desktop", "GitHub.GitHubDesktop"),
             ],
             "Media": [
                 ("VLC", "VideoLAN.VLC"),
@@ -130,6 +131,13 @@ class WinGetGUI:
             "Utilities": [
                 ("7-Zip", "7zip.7zip"),
                 ("Notepad++", "Notepad++.Notepad++"),
+                ("PowerToys", "Microsoft.PowerToys"),
+                ("Everything", "voidtools.Everything"),
+                ("CPU-Z", "CPUID.CPU-Z"),
+                ("HWMonitor", "CPUID.HWMonitor"),
+                ("Process Explorer", "Microsoft.Sysinternals.ProcessExplorer"),
+                ("Autoruns", "Microsoft.Sysinternals.Autoruns"),
+                ("WinRAR", "RARLab.WinRAR"),
             ],
         }
         
